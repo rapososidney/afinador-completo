@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Afinador de Precisão · Violão</title>
+  <meta name="theme-color" content="#17100a">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --amber:#f0b054;
+    --amber-hi:#ffd88a;
+    --amber-dim:#9c7434;
+    --green:#7fe09a;
+    --green-dim:#3f7a52;
+    --panel:rgba(30,21,12,.90);
+    --line:#584124;
+    --txt:#efe3cf;
+    --muted:#b09a78;
+    --faint:#7d6a4e;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    min-height:100vh;color:var(--txt);
+    font-family:-apple-system,'Segoe UI',Roboto,Ubuntu,sans-serif;
+    background:
+      radial-gradient(1100px 700px at 75% -10%, rgba(255,190,90,.09), transparent 60%),
+      repeating-linear-gradient(93deg, rgba(0,0,0,.11) 0 2px, transparent 2px 7px),
+      linear-gradient(180deg,#221708,#17100a 55%,#100b06);
+    display:flex;justify-content:center;
+    padding:16px 12px 40px;
+  }
+  .app{width:100%;max-width:720px}
+  header{text-align:center;margin-bottom:14px}
+  h1{margin:0;font-size:1.4rem;letter-spacing:.4px;color:var(--amber-hi);font-weight:600}
+  .sub{color:var(--muted);font-size:.82rem;margin-top:4px}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:12px;
+    box-shadow:0 6px 24px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,214,138,.06);
+  }
+
+  /* ---- nota / alvo ---- */
+  .noteWrap{display:flex;align-items:baseline;justify-content:center;gap:14px;min-height:64px}
+  .stringTag{font-size:.95rem;color:var(--muted);min-width:80px;text-align:right;line-height:1.3}
+  .stringTag em{display:block;font-style:normal;font-size:.72rem;color:var(--amber-dim)}
+  .noteBig{
+    font-size:3.4rem;line-height:1;font-weight:700;color:var(--amber);
+    font-variant-numeric:tabular-nums;transition:color .25s;
+    text-shadow:0 0 22px rgba(240,176,84,.25);
+  }
+  .noteBig.tuned{color:var(--green);text-shadow:0 0 26px rgba(127,224,154,.35)}
+  .targetHz{font-size:.85rem;color:var(--muted);min-width:80px;font-variant-numeric:tabular-nums;line-height:1.3}
+  .targetHz em{display:block;font-style:normal;font-size:.72rem;color:var(--faint)}
+  .idle .noteBig{color:var(--faint);text-shadow:none}
+
+  canvas{display:block;width:100%}
+  #gauge{height:230px}
+  #fine{height:92px;margin-top:4px}
+
+  .readouts{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:8px;margin-top:10px}
+  .cell{
+    background:rgba(0,0,0,.28);border:1px solid rgba(88,65,36,.6);
+    border-radius:10px;padding:8px 6px;text-align:center;
+  }
+  .cell .lbl{font-size:.68rem;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);margin-bottom:3px}
+  .cell .val{
+    font-family:'SF Mono',Consolas,'Roboto Mono',monospace;
+    font-size:1.05rem;color:var(--txt);font-variant-numeric:tabular-nums;white-space:nowrap;
+  }
+  .cell .val small{font-size:.72em;color:var(--muted)}
+  .idle .cell .val{color:var(--faint)}
+  #stableVal.ok{color:var(--green)}
+
+  .badgeRow{display:flex;justify-content:center;margin-top:10px;min-height:30px;gap:8px;flex-wrap:wrap}
+  .badge{
+    display:none;padding:5px 18px;border-radius:999px;
+    font-size:.85rem;font-weight:700;letter-spacing:1.5px;
+    border:1px solid var(--green-dim);color:var(--green);
+    background:rgba(127,224,154,.08);box-shadow:0 0 18px rgba(127,224,154,.18);
+  }
+  .badge.show{display:inline-block}
+  .badge.perfect{
+    color:#d9ffe6;border-color:var(--green);background:rgba(127,224,154,.16);
+    box-shadow:0 0 26px rgba(127,224,154,.4);
+  }
+  .hint{
+    display:none;font-size:.78rem;color:#ffd88a;text-align:center;margin-top:8px;
+    background:rgba(240,176,84,.10);border:1px solid var(--amber-dim);
+    border-radius:8px;padding:6px 10px;
+  }
+  .hint.show{display:block}
+
+  /* ---- controles ---- */
+  .rowLabel{font-size:.7rem;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);margin:2px 0 7px}
+  .rowLabel.sp{margin-top:16px}
+
+  .segbar{display:flex;gap:6px;margin-bottom:4px}
+  .segbar button{
+    flex:1;padding:9px 6px;cursor:pointer;border-radius:10px;
+    background:rgba(0,0,0,.3);border:1px solid var(--line);color:var(--txt);
+    font-family:inherit;font-size:.86rem;transition:all .15s;line-height:1.35;
+  }
+  .segbar button span{display:block;font-size:.68rem;color:var(--muted);margin-top:2px}
+  .segbar button.active{
+    background:linear-gradient(180deg, rgba(240,176,84,.22), rgba(240,176,84,.10));
+    border-color:var(--amber);color:var(--amber-hi);box-shadow:0 0 14px rgba(240,176,84,.18);
+  }
+  .segbar button.active span{color:var(--amber)}
+
+  .strings{display:flex;gap:6px;flex-wrap:wrap}
+  .strings button{
+    flex:1 1 74px;min-width:64px;padding:8px 4px;cursor:pointer;
+    background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:10px;
+    color:var(--txt);font-family:inherit;transition:all .15s;position:relative;
+  }
+  .strings button .bnote{display:block;font-size:1.05rem;font-weight:700;color:var(--amber)}
+  .strings button .bstr{display:block;font-size:.68rem;color:var(--muted);margin-top:2px}
+  .strings button.active{
+    background:linear-gradient(180deg, rgba(240,176,84,.22), rgba(240,176,84,.10));
+    border-color:var(--amber);box-shadow:0 0 14px rgba(240,176,84,.18);
+  }
+  .strings button.detected:not(.active){border-color:var(--amber-dim)}
+  .strings button .dot{
+    position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;
+    background:var(--green);display:none;
+  }
+  .strings button.calok .dot{display:block}
+
+  .calRow{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .calRow button{
+    padding:7px 12px;cursor:pointer;background:rgba(0,0,0,.3);
+    border:1px solid var(--line);border-radius:8px;color:var(--txt);
+    font-family:'SF Mono',Consolas,monospace;font-size:.85rem;
+  }
+  .calRow button:active{background:rgba(240,176,84,.15)}
+  #a4disp{
+    font-family:'SF Mono',Consolas,monospace;font-size:1rem;color:var(--amber-hi);
+    min-width:150px;text-align:center;font-variant-numeric:tabular-nums;
+  }
+
+  /* ---- assistente de calibração ---- */
+  .wizBox{
+    background:rgba(0,0,0,.26);border:1px solid rgba(88,65,36,.7);
+    border-radius:10px;padding:11px;margin-bottom:10px;
+  }
+  #wizMsg{font-size:.86rem;color:var(--txt);line-height:1.45;min-height:2.6em}
+  #wizMsg b{color:var(--amber-hi)}
+  #wizMsg .step{
+    display:inline-block;font-size:.68rem;letter-spacing:.8px;text-transform:uppercase;
+    color:var(--faint);margin-bottom:3px;
+  }
+  .wizBar{height:5px;background:rgba(0,0,0,.45);border-radius:3px;overflow:hidden;margin:9px 0 10px;display:none}
+  .wizBar.show{display:block}
+  #wizFill{height:100%;width:0%;background:linear-gradient(90deg,var(--amber),var(--green));transition:width .18s}
+  .wizBtns{display:flex;gap:7px}
+  .wizBtns button{
+    flex:1;padding:9px;cursor:pointer;border-radius:9px;font-family:inherit;font-size:.86rem;
+    background:rgba(0,0,0,.3);border:1px solid var(--line);color:var(--txt);
+  }
+  #wizBtn{border-color:var(--amber-dim);color:var(--amber-hi)}
+  #wizBtn:disabled{opacity:.4;cursor:default;border-color:var(--line);color:var(--faint)}
+
+  table.calTable{width:100%;border-collapse:collapse;font-size:.8rem}
+  table.calTable th{
+    font-size:.66rem;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);
+    font-weight:500;text-align:right;padding:4px 5px;border-bottom:1px solid rgba(88,65,36,.6);
+  }
+  table.calTable th:first-child{text-align:left}
+  table.calTable td{
+    padding:5px;border-bottom:1px solid rgba(88,65,36,.28);text-align:right;
+    font-family:'SF Mono',Consolas,monospace;font-variant-numeric:tabular-nums;color:var(--txt);
+  }
+  table.calTable td:first-child{text-align:left;font-family:inherit;color:var(--muted)}
+  table.calTable tr.unset td{color:var(--faint)}
+  table.calTable tr.cur td:first-child{color:var(--amber-hi)}
+  .calFoot{display:flex;gap:7px;margin-top:11px}
+  .calFoot button{
+    flex:1;padding:8px;cursor:pointer;border-radius:9px;font-family:inherit;font-size:.8rem;
+    background:rgba(0,0,0,.3);border:1px solid var(--line);color:var(--muted);
+  }
+
+  .startRow{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:16px}
+  #startBtn{
+    padding:12px 34px;font-size:1rem;font-weight:600;cursor:pointer;border-radius:12px;
+    border:1px solid var(--amber);color:#1c1206;
+    background:linear-gradient(180deg,var(--amber-hi),var(--amber));
+    box-shadow:0 4px 18px rgba(240,176,84,.28);font-family:inherit;transition:all .15s;
+  }
+  #startBtn.running{color:var(--txt);background:rgba(0,0,0,.35);border-color:var(--line);box-shadow:none}
+  #status{font-size:.82rem;color:var(--muted);text-align:center;min-height:1.2em}
+
+  footer{
+    color:var(--faint);font-size:.72rem;line-height:1.55;text-align:left;
+    max-width:640px;margin:0 auto;padding:0 6px;
+  }
+  footer b{color:var(--muted);font-weight:600}
+  footer p{margin:0 0 8px}
+  @media (max-width:460px){
+    .noteBig{font-size:2.7rem}
+    .readouts{grid-template-columns:1fr 1fr}
+    .readouts .cell:last-child{grid-column:1/-1}
+  }
+  @media (prefers-reduced-motion:reduce){ .badge{box-shadow:none} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Afinador de Precisão · Violão</h1>
+    <div class="sub">E–A–D–G–B–E · fundamental ou harmônico da 12ª casa</div>
+  </header>
+
+  <!-- ==================== MOSTRADOR ==================== -->
+  <div class="panel idle" id="displayPanel">
+    <div class="noteWrap">
+      <div class="stringTag" id="stringTag">—</div>
+      <div class="noteBig" id="noteBig">–</div>
+      <div class="targetHz" id="targetHz">alvo — Hz</div>
+    </div>
+    <canvas id="gauge"></canvas>
+    <canvas id="fine"></canvas>
+    <div class="readouts">
+      <div class="cell">
+        <div class="lbl">Frequência</div>
+        <div class="val" id="freqVal">— Hz</div>
+      </div>
+      <div class="cell">
+        <div class="lbl">Desvio agora</div>
+        <div class="val" id="instVal">— ¢</div>
+      </div>
+      <div class="cell">
+        <div class="lbl">Média estável (2 s)</div>
+        <div class="val" id="stableVal">— ¢</div>
+      </div>
+    </div>
+    <div class="badgeRow"><span class="badge" id="badge">AFINADO</span></div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <!-- ==================== CONTROLES ==================== -->
+  <div class="panel">
+    <div class="rowLabel">O que você vai tocar</div>
+    <div class="segbar" id="modeBar">
+      <button data-m="fund" class="active">Corda solta<span>fundamental</span></button>
+      <button data-m="harm">Harmônico<span>12ª casa</span></button>
+    </div>
+
+    <div class="rowLabel sp">Corda</div>
+    <div class="strings" id="stringBtns">
+      <button data-i="auto" class="active"><span class="bnote">Auto</span><span class="bstr">detectar</span></button>
+      <button data-i="0"><span class="dot"></span><span class="bnote">E2</span><span class="bstr">6ª corda</span></button>
+      <button data-i="1"><span class="dot"></span><span class="bnote">A2</span><span class="bstr">5ª corda</span></button>
+      <button data-i="2"><span class="dot"></span><span class="bnote">D3</span><span class="bstr">4ª corda</span></button>
+      <button data-i="3"><span class="dot"></span><span class="bnote">G3</span><span class="bstr">3ª corda</span></button>
+      <button data-i="4"><span class="dot"></span><span class="bnote">B3</span><span class="bstr">2ª corda</span></button>
+      <button data-i="5"><span class="dot"></span><span class="bnote">E4</span><span class="bstr">1ª corda</span></button>
+    </div>
+
+    <div class="calRow">
+      <button data-d="-1">−1</button>
+      <button data-d="-0.1">−0,1</button>
+      <span id="a4disp">A4 = 440,0 Hz</span>
+      <button data-d="0.1">+0,1</button>
+      <button data-d="1">+1</button>
+      <button data-d="reset">440</button>
+    </div>
+
+    <div class="startRow">
+      <button id="startBtn">▶ Iniciar microfone</button>
+      <div id="status">Toque em iniciar e permita o acesso ao microfone.</div>
+    </div>
+  </div>
+
+  <!-- ==================== CALIBRAÇÃO DE INARMONICIDADE ==================== -->
+  <div class="panel">
+    <div class="rowLabel">Inarmonicidade — medida da sua corda</div>
+    <div class="wizBox">
+      <div id="wizMsg"><span class="step">como funciona</span><br>
+        Escolha uma corda acima e toque em <b>Medir</b>. O afinador vai pedir a corda solta e
+        depois o harmônico, e calcula sozinho o quanto o 2º parcial foge de 2f.</div>
+      <div class="wizBar" id="wizBar"><div id="wizFill"></div></div>
+      <div class="wizBtns">
+        <button id="wizBtn" disabled>Medir corda …</button>
+        <button id="wizCancel" hidden>Cancelar</button>
+      </div>
+    </div>
+    <table class="calTable" id="calTable"></table>
+    <div class="calFoot">
+      <button id="calClear">Limpar tudo</button>
+      <button id="calLink">Copiar link calibrado</button>
+    </div>
+  </div>
+
+  <footer id="foot">
+    <p><b>Fundamental vs. harmônico.</b> Medir o harmônico da 12ª casa (2f) tem três vantagens:
+    o erro em cents cai pela metade para a mesma janela; o som é quase senoidal, o cenário ideal
+    para o refino espectral; e microfone de celular responde mal abaixo de ~100 Hz, então o mi
+    grave chega muito mais limpo em 165 Hz do que em 82 Hz.</p>
+    <p><b>Por que calibrar.</b> Por rigidez da corda, o 2º parcial não é exatamente 2f — é um
+    pouco alto. Afinar o harmônico em 2×alvo deixaria a corda solta baixa por essa quantia.
+    O assistente mede <i>a sua</i> corda (f₁ solta e f₂ harmônico) e corrige o alvo. Em nylon o
+    desvio costuma ser de alguns centésimos de cent — menor que o erro do próprio conversor A/D;
+    em aço chega a alguns décimos. A calibração vale mais como verificação e demonstração do que
+    como ganho de afinação.</p>
+    <p><b>Método.</b> YIN (autocorrelação normalizada) para a estimativa grosseira + refino pelo
+    pico espectral em frequência fracionária (janela Hann de ~0,7 s, seção áurea). A
+    <b>média estável</b> é robusta (mediana + rejeição de outliers) sobre 2 s, com a incerteza
+    <b>±</b> desenhada como faixa no medidor fino. Resolução de exibição 0,01 ¢; a exatidão
+    absoluta esbarra no clock do conversor A/D (±0,1–0,2 ¢ típico) e na própria corda, que cai
+    alguns cents durante o decaimento.</p>
+  </footer>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   AFINADOR DE PRECISÃO v2
+   Modo fundamental + modo harmônico (12ª casa) com calibração
+   empírica de inarmonicidade por corda.
+   ============================================================ */
+
+const $ = id => document.getElementById(id);
+const fmt  = (v,d) => v.toFixed(d).replace('.', ',');
+const fmtS = (v,d) => (v < 0 ? '−' : '+') + Math.abs(v).toFixed(d).replace('.', ',');
+
+/* ---------- estado ---------- */
+const STRINGS = [
+  {note:'E2', tag:'6ª corda', semi:-29},
+  {note:'A2', tag:'5ª corda', semi:-24},
+  {note:'D3', tag:'4ª corda', semi:-19},
+  {note:'G3', tag:'3ª corda', semi:-14},
+  {note:'B3', tag:'2ª corda', semi:-10},
+  {note:'E4', tag:'1ª corda', semi:-5},
+];
+const state = { a4:440.0, mode:'auto', lockedIdx:null, pitch:'fund', running:false };
+
+// desvio medido do 2º parcial em relação a 2f, em cents (null = não calibrado)
+const cal = [null,null,null,null,null,null];
+
+const targetFreq = i => state.a4 * Math.pow(2, STRINGS[i].semi/12);
+// frequência que esperamos OUVIR na corda i, conforme o modo
+function listenFreq(i){
+  if (state.pitch === 'fund') return targetFreq(i);
+  const off = cal[i] || 0;
+  return 2 * targetFreq(i) * Math.pow(2, off/1200);
+}
+
+/* ---------- áudio ---------- */
+let audioCtx=null, analyser=null, srcNode=null, mediaStream=null;
+let timeBuf=null, xw=null, hann=null, dec=null;
+
+/* ---------- detecção / exibição ---------- */
+let lastDetectT=0, lastValidT=-1e9;
+let instantF=null, instantCents=null, displayCents=0;
+let targetIdx=null, autoPrev=-1, autoCount=0;
+let ring=[];        // {t, f}
+let stable=null;    // {mean, se, n}
+let rafId=0;
+
+/* ---------- assistente de calibração ---------- */
+const wiz = { active:false, stage:'idle', idx:null, f1:null, f2:null };
+
+/* ============================================================
+   YIN
+   ============================================================ */
+function yin(x, fs, fmin, fmax){
+  const tauMin = Math.max(2, Math.floor(fs/fmax));
+  const tauMax = Math.ceil(fs/fmin);
+  const W = Math.min(4096, x.length - tauMax - 2);
+  if (W < 512) return null;
+  const start = x.length - W - tauMax;
+
+  const d = new Float64Array(tauMax+1);
+  for (let tau=1; tau<=tauMax; tau++){
+    let sum=0;
+    for (let j=0; j<W; j++){
+      const diff = x[start+j] - x[start+j+tau];
+      sum += diff*diff;
+    }
+    d[tau]=sum;
+  }
+  const dp = new Float64Array(tauMax+1); dp[0]=1;
+  let run=0;
+  for (let tau=1; tau<=tauMax; tau++){
+    run += d[tau];
+    dp[tau] = run===0 ? 1 : d[tau]*tau/run;
+  }
+  const THR=0.12;
+  let tauEst=-1;
+  for (let tau=tauMin; tau<=tauMax; tau++){
+    if (dp[tau] < THR){
+      while (tau+1<=tauMax && dp[tau+1] < dp[tau]) tau++;
+      tauEst=tau; break;
+    }
+  }
+  if (tauEst<0){
+    let m=Infinity;
+    for (let tau=tauMin; tau<=tauMax; tau++)
+      if (dp[tau]<m){ m=dp[tau]; tauEst=tau; }
+  }
+  if (tauEst<=tauMin || tauEst>=tauMax) return null;
+
+  const a=dp[tauEst-1], b=dp[tauEst], c=dp[tauEst+1];
+  const den = a - 2*b + c;
+  const shift = den!==0 ? 0.5*(a-c)/den : 0;
+  const tau = tauEst + Math.max(-1, Math.min(1, shift));
+  return { f: fs/tau, conf: 1-b };
+}
+
+/* ============================================================
+   Refino espectral
+   ============================================================ */
+function dftMag2(f, fs){
+  const w = 2*Math.PI*f/fs, cw=Math.cos(w), sw=Math.sin(w);
+  let c=1, s=0, re=0, im=0;
+  const N = xw.length;
+  for (let n=0; n<N; n++){
+    const v = xw[n];
+    re += v*c;
+    im -= v*s;
+    const nc = c*cw - s*sw;
+    s = s*cw + c*sw;
+    c = nc;
+  }
+  return re*re + im*im;
+}
+function refine(f0, fs){
+  const half = Math.min(2.0, f0*0.015);
+  let bestF=f0, bestM=-1;
+  const K=9, step = 2*half/(K-1);
+  for (let k=0; k<K; k++){
+    const f = f0 - half + step*k;
+    const m = dftMag2(f, fs);
+    if (m > bestM){ bestM=m; bestF=f; }
+  }
+  let a = bestF - step, b = bestF + step;
+  const gr = (Math.sqrt(5)-1)/2;
+  let c = b - gr*(b-a), d = a + gr*(b-a);
+  let fc = dftMag2(c, fs), fd = dftMag2(d, fs);
+  for (let i=0; i<30; i++){
+    if (fc > fd){ b=d; d=c; fd=fc; c=b-gr*(b-a); fc=dftMag2(c, fs); }
+    else        { a=c; c=d; fc=fd; d=a+gr*(b-a); fd=dftMag2(d, fs); }
+  }
+  return (a+b)/2;
+}
+
+/* ============================================================
+   Estatística robusta sobre o anel
+   ============================================================ */
+function median(arr){
+  const s=[...arr].sort((x,y)=>x-y), m=s.length>>1;
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+function robustStats(){
+  if (ring.length < 5) return null;
+  const fsAll = ring.map(r=>r.f);
+  const med = median(fsAll);
+  const cs = fsAll.map(f => 1200*Math.log2(f/med));
+  const mad = median(cs.map(v=>Math.abs(v)));
+  const tol = Math.max(0.35, 3*1.4826*mad);
+  const keep = cs.filter(v => Math.abs(v) <= tol);
+  if (keep.length < 4) return null;
+  const m = keep.reduce((a,b)=>a+b,0)/keep.length;
+  const va = keep.reduce((a,v)=>a+(v-m)*(v-m),0)/(keep.length-1);
+  const sd = Math.sqrt(va);
+  const span = ring[ring.length-1].t - ring[0].t;
+  const neff = Math.max(1.5, span/0.7);   // janelas de 0,7 s se sobrepõem
+  return { f: med*Math.pow(2, m/1200), se: sd/Math.sqrt(neff), n: keep.length, span };
+}
+
+/* ============================================================
+   Faixa de busca conforme o modo / assistente
+   ============================================================ */
+function searchRange(){
+  const oct = s => Math.pow(2, s/12);
+  if (wiz.active && wiz.stage==='open'){
+    const ft = targetFreq(wiz.idx);
+    return [ft*oct(-2.5), ft*oct(2.5)];
+  }
+  if (wiz.active && wiz.stage==='harm'){
+    const fh = 2*wiz.f1;
+    return [fh*oct(-1.5), fh*oct(1.5)];
+  }
+  if (state.mode==='lock'){
+    const fl = listenFreq(state.lockedIdx);
+    return [fl*oct(-4), fl*oct(4)];
+  }
+  return state.pitch==='fund' ? [62, 460] : [130, 780];
+}
+
+/* ============================================================
+   Ciclo de detecção
+   ============================================================ */
+function detect(nowMs){
+  const t = nowMs/1000;
+
+  let s=0;
+  for (let i=0; i<timeBuf.length; i+=4) s += timeBuf[i]*timeBuf[i];
+  const rms = Math.sqrt(s/(timeBuf.length/4));
+  const floor = (state.pitch==='harm' || (wiz.active && wiz.stage==='harm')) ? 0.0015 : 0.0028;
+  if (rms < floor){
+    if (!wiz.active) setStatus('Aguardando som…');
+    return;
+  }
+
+  const fs = audioCtx.sampleRate;
+
+  // decimação ×4
+  const dLen = timeBuf.length >> 2;
+  if (!dec || dec.length !== dLen) dec = new Float64Array(dLen);
+  for (let k=0; k<dLen; k++){
+    const i = k<<2;
+    dec[k] = (timeBuf[i]+timeBuf[i+1]+timeBuf[i+2]+timeBuf[i+3])*0.25;
+  }
+
+  const [fmin,fmax] = searchRange();
+  const y = yin(dec, fs/4, fmin, fmax);
+  if (!y || y.conf < 0.55){
+    if (!wiz.active) setStatus('Sinal instável — deixe a nota soar limpa.');
+    return;
+  }
+
+  // janela Hann + DC
+  let mean=0;
+  for (let n=0; n<timeBuf.length; n++) mean += timeBuf[n];
+  mean /= timeBuf.length;
+  for (let n=0; n<timeBuf.length; n++) xw[n] = (timeBuf[n]-mean)*hann[n];
+
+  const f = refine(y.f, fs);
+  if (!(f>0) || Math.abs(1200*Math.log2(f/y.f)) > 60) return;
+
+  // anel: reinicia após pausa longa (nova palhetada)
+  if (lastValidT > 0 && (nowMs - lastValidT) > 1000) ring.length = 0;
+  ring.push({t, f});
+  while (ring.length && t - ring[0].t > 2.5) ring.shift();
+  lastValidT = nowMs;
+  instantF = f;
+
+  const st = robustStats();
+
+  /* ---------- modo assistente ---------- */
+  if (wiz.active){
+    wizardTick(st);
+    return;
+  }
+
+  /* ---------- modo normal ---------- */
+  let newIdx = targetIdx;
+  if (state.mode==='lock'){ newIdx = state.lockedIdx; }
+  else {
+    let bi=0, bd=Infinity;
+    for (let i=0; i<6; i++){
+      const d = Math.abs(Math.log2(f/listenFreq(i)));
+      if (d<bd){ bd=d; bi=i; }
+    }
+    if (bi === targetIdx){ autoCount=0; }
+    else {
+      if (bi===autoPrev) autoCount++; else { autoPrev=bi; autoCount=1; }
+      if (autoCount>=2 || targetIdx===null){ newIdx=bi; autoCount=0; }
+    }
+  }
+  if (newIdx !== targetIdx){ targetIdx=newIdx; ring.length=0; stable=null; }
+
+  const fl = listenFreq(targetIdx);
+  instantCents = 1200*Math.log2(f/fl);
+  stable = st ? { mean: 1200*Math.log2(st.f/fl), se: st.se, n: st.n } : null;
+
+  checkWrongMode(f);
+  updateReadouts(fl);
+  setStatus(state.mode==='auto' ? 'Detecção automática ativa.' : 'Corda travada.');
+}
+
+/* aviso: tocou corda solta no modo harmônico (ou vice-versa) */
+function checkWrongMode(f){
+  const h = $('hint');
+  const distTo = arr => Math.min(...arr.map(v => Math.abs(1200*Math.log2(f/v))));
+  const funds = STRINGS.map((_,i)=>targetFreq(i));
+  const harms = STRINGS.map((_,i)=>2*targetFreq(i));
+  const dF = distTo(funds), dH = distTo(harms);
+  let msg='';
+  if (state.pitch==='harm' && dF < 40 && dH > 120)
+    msg = 'Isso soou como uma corda solta. Troque para “Corda solta” ou toque o harmônico.';
+  else if (state.pitch==='fund' && dH < 40 && dF > 120)
+    msg = 'Isso soou como um harmônico. Troque para “Harmônico (12ª casa)”.';
+  h.textContent = msg;
+  h.classList.toggle('show', !!msg);
+}
+
+/* ============================================================
+   Assistente de calibração
+   ============================================================ */
+function wizStart(){
+  if (state.mode!=='lock'){ return; }
+  if (!state.running){ setStatus('Inicie o microfone primeiro.'); return; }
+  wiz.active=true; wiz.idx=state.lockedIdx; wiz.f1=null; wiz.f2=null; wiz.stage='open';
+  ring.length=0; stable=null;
+  $('wizCancel').hidden=false; $('wizBtn').disabled=true;
+  $('wizBar').classList.add('show');
+  wizMsg('passo 1 de 2',
+    'Toque a <b>'+STRINGS[wiz.idx].tag+' solta</b> e deixe soar. '+
+    'Ela deve estar razoavelmente afinada (menos de meio tom de erro).');
+}
+function wizCancel(){
+  wiz.active=false; wiz.stage='idle'; wiz.f1=null; wiz.f2=null;
+  ring.length=0; stable=null;
+  $('wizCancel').hidden=true;
+  $('wizBar').classList.remove('show'); $('wizFill').style.width='0%';
+  refreshWizBtn();
+  wizMsg('como funciona',
+    'Escolha uma corda acima e toque em <b>Medir</b>. O afinador vai pedir a corda solta e '+
+    'depois o harmônico, e calcula sozinho o quanto o 2º parcial foge de 2f.');
+}
+function wizMsg(step, html){
+  $('wizMsg').innerHTML = '<span class="step">'+step+'</span><br>'+html;
+}
+function wizardTick(st){
+  // progresso: precisa de amostras, tempo e precisão
+  let p = 0;
+  if (st){
+    const pn = Math.min(1, st.n/9);
+    const pt = Math.min(1, st.span/1.3);
+    const pp = Math.min(1, 0.05/Math.max(st.se, 0.005));
+    p = Math.min(pn, pt, pp);
+  }
+  $('wizFill').style.width = (p*100).toFixed(0)+'%';
+
+  const ready = st && st.n>=9 && st.span>=1.3 && st.se<=0.05;
+  if (!ready) return;
+
+  if (wiz.stage==='open'){
+    wiz.f1 = st.f;
+    wiz.stage='harm';
+    ring.length=0;
+    $('wizFill').style.width='0%';
+    wizMsg('passo 2 de 2',
+      'Boa: <b>'+fmt(wiz.f1,3)+' Hz</b>. Agora encoste o dedo <b>exatamente sobre o traste da '+
+      '12ª casa</b>, toque e solte o dedo — o <b>harmônico</b> deve soar limpo.');
+  } else if (wiz.stage==='harm'){
+    wiz.f2 = st.f;
+    const off = 1200*Math.log2(wiz.f2/(2*wiz.f1));
+    if (Math.abs(off) > 25){
+      wizMsg('não deu certo',
+        'O que soou não parece o harmônico da 12ª casa (desvio de '+fmtS(off,1)+' ¢ é grande '+
+        'demais). Tente de novo com o dedo bem sobre o traste.');
+      wiz.stage='harm'; ring.length=0; return;
+    }
+    cal[wiz.idx] = off;
+    const r = wiz.f2/wiz.f1;
+    const B = (4 - r*r)/(r*r - 16);
+    wiz.active=false; wiz.stage='idle';
+    $('wizCancel').hidden=true;
+    $('wizBar').classList.remove('show'); $('wizFill').style.width='0%';
+    ring.length=0; stable=null;
+    refreshWizBtn(); renderCal();
+    wizMsg('medido',
+      STRINGS[wiz.idx].tag+': o 2º parcial está <b>'+fmtS(off,3)+' ¢</b> em relação a 2f '+
+      '(B = '+fmtB(B)+'). O alvo do modo harmônico já foi corrigido.');
+  }
+}
+function fmtB(B){
+  if (!isFinite(B)) return '—';
+  if (Math.abs(B) < 1e-7) return '≈ 0';
+  const e = Math.floor(Math.log10(Math.abs(B)));
+  const m = B/Math.pow(10,e);
+  const sup = {'-2':'⁻²','-3':'⁻³','-4':'⁻⁴','-5':'⁻⁵','-6':'⁻⁶','-7':'⁻⁷'}[String(e)] || ('^'+e);
+  return fmt(m,1)+' × 10'+sup;
+}
+
+/* ============================================================
+   DOM
+   ============================================================ */
+function setStatus(msg){ $('status').textContent = msg; }
+
+function updateReadouts(fl){
+  $('displayPanel').classList.remove('idle');
+  const st = STRINGS[targetIdx];
+  const harm = state.pitch==='harm';
+  $('noteBig').textContent   = st.note;
+  $('stringTag').innerHTML   = st.tag + (harm ? '<em>harmônico 12ª</em>' : '<em>corda solta</em>');
+  $('targetHz').innerHTML    = 'alvo ' + fmt(fl,4) + ' Hz' +
+    (harm ? '<em>' + (cal[targetIdx]!==null ? 'calibrado '+fmtS(cal[targetIdx],3)+' ¢' : '2f ideal — sem calibrar') + '</em>' : '<em>&nbsp;</em>');
+  $('freqVal').textContent   = fmt(instantF,3) + ' Hz';
+  $('instVal').textContent   = fmtS(instantCents,2) + ' ¢';
+
+  const sv = $('stableVal'), badge = $('badge'), nb = $('noteBig');
+  if (stable){
+    sv.innerHTML = fmtS(stable.mean,2) + ' <small>± ' + fmt(Math.max(stable.se,0.01),2) + '</small> ¢';
+    const perfect = Math.abs(stable.mean)<=0.15 && stable.se<=0.06 && stable.n>=6;
+    const tuned   = Math.abs(stable.mean)<=1.0;
+    sv.classList.toggle('ok', tuned);
+    nb.classList.toggle('tuned', tuned);
+    badge.classList.toggle('show', tuned);
+    badge.classList.toggle('perfect', perfect);
+    badge.textContent = perfect ? '✦ CRAVADO ±0,15 ¢' : 'AFINADO ±1 ¢';
+  } else {
+    sv.textContent='— ¢';
+    sv.classList.remove('ok');
+    nb.classList.remove('tuned');
+    badge.classList.remove('show','perfect');
+  }
+}
+function goIdle(){
+  $('displayPanel').classList.add('idle');
+  $('badge').classList.remove('show','perfect');
+  $('noteBig').classList.remove('tuned');
+  $('hint').classList.remove('show');
+  document.querySelectorAll('#stringBtns button').forEach(b=>b.classList.remove('detected'));
+}
+
+function renderCal(){
+  const rows = STRINGS.map((s,i)=>{
+    const on = cal[i]!==null;
+    let B='—';
+    if (on){
+      const r = 2*Math.pow(2, cal[i]/1200);
+      B = fmtB((4 - r*r)/(r*r - 16));
+    }
+    const cur = (state.mode==='lock' && state.lockedIdx===i) ? ' cur' : '';
+    return '<tr class="'+(on?'':'unset')+cur+'"><td>'+s.tag+' · '+s.note+'</td><td>'+
+           (on?fmtS(cal[i],3)+' ¢':'—')+'</td><td>'+B+'</td></tr>';
+  }).join('');
+  $('calTable').innerHTML =
+    '<tr><th>Corda</th><th>2º parcial vs 2f</th><th>B</th></tr>' + rows;
+  document.querySelectorAll('#stringBtns button').forEach(b=>{
+    if (b.dataset.i!=='auto') b.classList.toggle('calok', cal[+b.dataset.i]!==null);
+  });
+}
+function refreshWizBtn(){
+  const b = $('wizBtn');
+  if (state.mode==='lock'){
+    b.disabled = false;
+    b.textContent = 'Medir ' + STRINGS[state.lockedIdx].tag;
+  } else {
+    b.disabled = true;
+    b.textContent = 'Escolha uma corda acima';
+  }
+}
+
+/* ============================================================
+   Desenho
+   ============================================================ */
+function sizeCanvas(cv){
+  const dpr = window.devicePixelRatio || 1;
+  const r = cv.getBoundingClientRect();
+  const w = Math.round(r.width*dpr), h = Math.round(r.height*dpr);
+  if (cv.width!==w || cv.height!==h){ cv.width=w; cv.height=h; }
+  const g = cv.getContext('2d');
+  g.setTransform(dpr,0,0,dpr,0,0);
+  return { g, W:r.width, H:r.height };
+}
+const rad = deg => (deg-90)*Math.PI/180;
+const centsToDeg = c => Math.max(-56,Math.min(56, c))/50*60;
+
+function drawGauge(active, tuned){
+  const {g,W,H} = sizeCanvas($('gauge'));
+  g.clearRect(0,0,W,H);
+  const cx=W/2, cy=H-16, R=Math.min(H-34, W/2-14);
+
+  g.beginPath(); g.arc(cx,cy,R, rad(-62), rad(62));
+  g.strokeStyle='rgba(156,116,52,.55)'; g.lineWidth=2; g.stroke();
+
+  g.beginPath(); g.arc(cx,cy,R-2, rad(centsToDeg(-2)), rad(centsToDeg(2)));
+  g.strokeStyle='rgba(127,224,154,.5)'; g.lineWidth=6; g.stroke();
+
+  g.textAlign='center'; g.textBaseline='middle';
+  for (let c=-50; c<=50; c+=5){
+    const major = c%10===0;
+    const a = rad(centsToDeg(c));
+    const r1=R, r2=R-(major?15:8);
+    g.beginPath();
+    g.moveTo(cx+r1*Math.cos(a), cy+r1*Math.sin(a));
+    g.lineTo(cx+r2*Math.cos(a), cy+r2*Math.sin(a));
+    g.strokeStyle = c===0 ? 'rgba(127,224,154,.95)' : 'rgba(176,154,120,.55)';
+    g.lineWidth = c===0 ? 2.5 : (major?1.8:1);
+    g.stroke();
+    if (major){
+      const rl=R-28;
+      g.fillStyle = c===0 ? 'rgba(127,224,154,.9)' : 'rgba(176,154,120,.75)';
+      g.font='11px -apple-system, sans-serif';
+      g.fillText(c===0?'0':(c>0?'+'+c:''+c), cx+rl*Math.cos(a), cy+rl*Math.sin(a));
+    }
+  }
+  g.font='13px -apple-system, sans-serif';
+  g.fillStyle='rgba(125,106,78,.9)';
+  const aL=rad(-66), aR=rad(66), rE=R+2;
+  g.fillText('♭', cx+rE*Math.cos(aL), cy+rE*Math.sin(aL));
+  g.fillText('♯', cx+rE*Math.cos(aR), cy+rE*Math.sin(aR));
+
+  if (active){
+    const a = rad(centsToDeg(displayCents));
+    g.save();
+    if (tuned){ g.shadowColor='rgba(127,224,154,.7)'; g.shadowBlur=12; }
+    g.beginPath();
+    g.moveTo(cx-10*Math.cos(a), cy-10*Math.sin(a));
+    g.lineTo(cx+(R-24)*Math.cos(a), cy+(R-24)*Math.sin(a));
+    g.strokeStyle = tuned ? '#7fe09a' : '#f0b054';
+    g.lineWidth=3; g.lineCap='round'; g.stroke();
+    g.restore();
+  }
+  g.beginPath(); g.arc(cx,cy,7,0,Math.PI*2); g.fillStyle='#f0b054'; g.fill();
+  g.beginPath(); g.arc(cx,cy,3,0,Math.PI*2); g.fillStyle='#2a1c0e'; g.fill();
+}
+
+function drawFine(active){
+  const {g,W,H} = sizeCanvas($('fine'));
+  g.clearRect(0,0,W,H);
+  const pad=28, y=H*0.55, span=W-2*pad;
+  const X = c => pad + (Math.max(-5,Math.min(5,c))+5)/10*span;
+
+  g.font='10px -apple-system, sans-serif';
+  g.fillStyle='rgba(125,106,78,.9)';
+  g.textAlign='left'; g.fillText('zoom ±5 ¢', pad, 11);
+
+  g.fillStyle='rgba(127,224,154,.10)';
+  g.fillRect(X(-1), y-15, X(1)-X(-1), 30);
+
+  g.strokeStyle='rgba(156,116,52,.5)'; g.lineWidth=1.5;
+  g.beginPath(); g.moveTo(pad,y); g.lineTo(W-pad,y); g.stroke();
+  g.textAlign='center'; g.textBaseline='top';
+  for (let c=-5; c<=5; c+=0.5){
+    const mj = Number.isInteger(c);
+    g.beginPath();
+    g.moveTo(X(c), y-(mj?9:5));
+    g.lineTo(X(c), y+(mj?9:5));
+    g.strokeStyle = c===0 ? 'rgba(127,224,154,.95)' : 'rgba(176,154,120,.5)';
+    g.lineWidth = c===0 ? 2 : 1;
+    g.stroke();
+    if (mj){
+      g.fillStyle = c===0 ? 'rgba(127,224,154,.9)' : 'rgba(176,154,120,.7)';
+      g.font='10px -apple-system, sans-serif';
+      g.fillText(c===0?'0':(c>0?'+'+c:''+c), X(c), y+13);
+    }
+  }
+  if (!active) return;
+
+  if (stable){
+    const m=stable.mean, se=Math.max(stable.se,0.02);
+    if (Math.abs(m) <= 5.6){
+      g.fillStyle='rgba(127,224,154,.22)';
+      g.fillRect(X(m-se), y-17, Math.max(2, X(m+se)-X(m-se)), 34);
+      g.beginPath(); g.moveTo(X(m), y-19); g.lineTo(X(m), y+19);
+      g.strokeStyle = Math.abs(m)<=1 ? '#7fe09a' : '#ffd88a';
+      g.lineWidth=2.5; g.stroke();
+    } else {
+      const edge = m>0 ? W-pad : pad, dir = m>0?1:-1;
+      g.fillStyle='#ffd88a';
+      g.beginPath();
+      g.moveTo(edge+8*dir, y); g.lineTo(edge, y-7); g.lineTo(edge, y+7);
+      g.closePath(); g.fill();
+    }
+  }
+  if (instantCents!==null){
+    g.beginPath(); g.arc(X(instantCents), y, 5, 0, Math.PI*2);
+    g.fillStyle='rgba(240,176,84,.55)'; g.fill();
+  }
+}
+
+/* ============================================================
+   Loop
+   ============================================================ */
+function loop(){
+  if (!state.running) return;
+  rafId = requestAnimationFrame(loop);
+  analyser.getFloatTimeDomainData(timeBuf);
+
+  const now = performance.now();
+  if (now - lastDetectT >= 90){ lastDetectT = now; detect(now); }
+
+  const active = (now - lastValidT) < 1200 && !wiz.active;
+  if (!active){
+    displayCents += (0 - displayCents)*0.10;
+    if (now - lastValidT > 1600 && now - lastValidT < 1800) goIdle();
+  } else if (instantCents !== null){
+    displayCents += (Math.max(-56,Math.min(56,instantCents)) - displayCents)*0.18;
+  }
+  const tuned = active && stable && Math.abs(stable.mean)<=1.0;
+  drawGauge(active, tuned);
+  drawFine(active);
+}
+
+/* ============================================================
+   Início / parada
+   ============================================================ */
+async function start(){
+  try{
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio:{ echoCancellation:false, noiseSuppression:false,
+              autoGainControl:false, channelCount:1 }
+    });
+  }catch(e){
+    setStatus('Microfone bloqueado. Permita o acesso — ou abra pelo endereço HTTPS do GitHub Pages.');
+    return;
+  }
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  await audioCtx.resume();
+  srcNode  = audioCtx.createMediaStreamSource(mediaStream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 32768;
+  analyser.smoothingTimeConstant = 0;
+  srcNode.connect(analyser);
+
+  timeBuf = new Float32Array(analyser.fftSize);
+  hann    = new Float64Array(analyser.fftSize);
+  xw      = new Float64Array(analyser.fftSize);
+  for (let n=0; n<hann.length; n++)
+    hann[n] = 0.5*(1 - Math.cos(2*Math.PI*n/(hann.length-1)));
+
+  state.running = true;
+  ring.length=0; stable=null; instantCents=null; targetIdx=null; lastValidT=-1e9;
+  $('startBtn').textContent='■ Parar'; $('startBtn').classList.add('running');
+  setStatus('Aguardando som…');
+  loop();
+}
+function stop(){
+  state.running=false;
+  cancelAnimationFrame(rafId);
+  wizCancel();
+  if (mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
+  if (audioCtx) audioCtx.close();
+  audioCtx=null; analyser=null; mediaStream=null;
+  instantCents=null; stable=null;
+  goIdle();
+  $('noteBig').textContent='–'; $('stringTag').textContent='—';
+  $('targetHz').textContent='alvo — Hz';
+  $('freqVal').textContent='— Hz'; $('instVal').textContent='— ¢'; $('stableVal').textContent='— ¢';
+  $('startBtn').textContent='▶ Iniciar microfone'; $('startBtn').classList.remove('running');
+  setStatus('Microfone parado.');
+  drawGauge(false,false); drawFine(false);
+}
+$('startBtn').addEventListener('click', ()=> state.running ? stop() : start());
+
+/* ---------- modo fundamental / harmônico ---------- */
+document.querySelectorAll('#modeBar button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#modeBar button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    state.pitch = btn.dataset.m;
+    wizCancel();
+    ring.length=0; stable=null; instantCents=null; targetIdx=null; autoCount=0; autoPrev=-1;
+    goIdle();
+    if (state.mode==='lock') showLockedTarget();
+  });
+});
+
+/* ---------- botões de corda ---------- */
+function showLockedTarget(){
+  const i = state.lockedIdx, harm = state.pitch==='harm';
+  $('noteBig').textContent = STRINGS[i].note;
+  $('stringTag').innerHTML = STRINGS[i].tag + (harm?'<em>harmônico 12ª</em>':'<em>corda solta</em>');
+  $('targetHz').innerHTML  = 'alvo '+fmt(listenFreq(i),4)+' Hz' +
+    (harm ? '<em>'+(cal[i]!==null?'calibrado '+fmtS(cal[i],3)+' ¢':'2f ideal — sem calibrar')+'</em>' : '<em>&nbsp;</em>');
+}
+document.querySelectorAll('#stringBtns button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#stringBtns button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    wizCancel();
+    const v = btn.dataset.i;
+    if (v==='auto'){ state.mode='auto'; state.lockedIdx=null; }
+    else { state.mode='lock'; state.lockedIdx=+v; targetIdx=+v; }
+    ring.length=0; stable=null; autoCount=0; autoPrev=-1;
+    if (state.mode==='lock') showLockedTarget();
+    refreshWizBtn(); renderCal();
+  });
+});
+setInterval(()=>{
+  if (state.mode!=='auto') return;
+  document.querySelectorAll('#stringBtns button').forEach(b=>{
+    b.classList.toggle('detected', b.dataset.i!=='auto' && +b.dataset.i===targetIdx
+      && performance.now()-lastValidT<1200);
+  });
+}, 200);
+
+/* ---------- calibração A4 ---------- */
+function refreshA4(){
+  $('a4disp').textContent = 'A4 = ' + fmt(state.a4,1) + ' Hz';
+  ring.length=0; stable=null;
+  if (state.mode==='lock') showLockedTarget();
+}
+document.querySelectorAll('.calRow button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const d = btn.dataset.d;
+    state.a4 = d==='reset' ? 440.0
+      : Math.min(470, Math.max(400, Math.round((state.a4+parseFloat(d))*10)/10));
+    refreshA4();
+  });
+});
+
+/* ---------- assistente ---------- */
+$('wizBtn').addEventListener('click', wizStart);
+$('wizCancel').addEventListener('click', wizCancel);
+$('calClear').addEventListener('click', ()=>{
+  for (let i=0;i<6;i++) cal[i]=null;
+  renderCal();
+  if (state.mode==='lock') showLockedTarget();
+});
+$('calLink').addEventListener('click', ()=>{
+  const enc = cal.map(v => v===null ? 'x' : v.toFixed(3)).join(',');
+  const url = location.origin + location.pathname + '#cal=' + enc;
+  const done = () => { const b=$('calLink'); b.textContent='Link copiado ✓';
+                       setTimeout(()=>b.textContent='Copiar link calibrado',1800); };
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, ()=>prompt('Copie o link:', url));
+  else prompt('Copie o link:', url);
+});
+
+/* ---------- calibração vinda da URL ---------- */
+(function loadCalFromHash(){
+  const m = /(?:^|[#&])cal=([^&]+)/.exec(location.hash);
+  if (!m) return;
+  const parts = decodeURIComponent(m[1]).split(',');
+  if (parts.length!==6) return;
+  parts.forEach((p,i)=>{
+    const v = parseFloat(p);
+    if (isFinite(v) && Math.abs(v)<=25) cal[i]=v;
+  });
+})();
+
+/* ---------- primeiro desenho ---------- */
+window.addEventListener('resize', ()=>{ drawGauge(false,false); drawFine(false); });
+renderCal(); refreshWizBtn();
+drawGauge(false,false); drawFine(false);
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
