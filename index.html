@@ -2,12 +2,18 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#17100a">
+<meta name="description" content="Afinador de violão de precisão, com calibração de inarmonicidade. Funciona offline.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Afinador">
 <title>Afinador de Precisão · Violão</title>
-  <meta name="theme-color" content="#17100a">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root{
     --amber:#f0b054;
@@ -19,10 +25,13 @@
     --line:#584124;
     --txt:#efe3cf;
     --muted:#b09a78;
-    --faint:#7d6a4e;
+    --faint:#a08a68;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;padding:0}
+  html,body{
+    margin:0;padding:0;height:100%;
+    overscroll-behavior:none;
+  }
   body{
     min-height:100vh;color:var(--txt);
     font-family:-apple-system,'Segoe UI',Roboto,Ubuntu,sans-serif;
@@ -31,8 +40,20 @@
       repeating-linear-gradient(93deg, rgba(0,0,0,.11) 0 2px, transparent 2px 7px),
       linear-gradient(180deg,#221708,#17100a 55%,#100b06);
     display:flex;justify-content:center;
-    padding:16px 12px 40px;
+    padding:max(16px, env(safe-area-inset-top, 0px)) 12px max(40px, env(safe-area-inset-bottom, 0px));
   }
+  button,[role="button"]{touch-action:manipulation}
+  :focus-visible{
+    outline:2px solid var(--amber-hi);
+    outline-offset:2px;
+    border-radius:8px;
+  }
+  .segbar button:active,
+  .strings button:active,
+  .calRow button:active,
+  .wizBtns button:active,
+  .calFoot button:active,
+  #startBtn:active{ filter:brightness(1.15); }
   .app{width:100%;max-width:720px}
   header{text-align:center;margin-bottom:14px}
   h1{margin:0;font-size:1.4rem;letter-spacing:.4px;color:var(--amber-hi);font-weight:600}
@@ -47,7 +68,6 @@
     box-shadow:0 6px 24px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,214,138,.06);
   }
 
-  /* ---- nota / alvo ---- */
   .noteWrap{display:flex;align-items:baseline;justify-content:center;gap:14px;min-height:64px}
   .stringTag{font-size:.95rem;color:var(--muted);min-width:80px;text-align:right;line-height:1.3}
   .stringTag em{display:block;font-style:normal;font-size:.72rem;color:var(--amber-dim)}
@@ -98,7 +118,6 @@
   }
   .hint.show{display:block}
 
-  /* ---- controles ---- */
   .rowLabel{font-size:.7rem;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);margin:2px 0 7px}
   .rowLabel.sp{margin-top:16px}
 
@@ -140,13 +159,11 @@
     border:1px solid var(--line);border-radius:8px;color:var(--txt);
     font-family:'SF Mono',Consolas,monospace;font-size:.85rem;
   }
-  .calRow button:active{background:rgba(240,176,84,.15)}
   #a4disp{
     font-family:'SF Mono',Consolas,monospace;font-size:1rem;color:var(--amber-hi);
     min-width:150px;text-align:center;font-variant-numeric:tabular-nums;
   }
 
-  /* ---- assistente de calibração ---- */
   .wizBox{
     background:rgba(0,0,0,.26);border:1px solid rgba(88,65,36,.7);
     border-radius:10px;padding:11px;margin-bottom:10px;
@@ -208,7 +225,15 @@
     .readouts{grid-template-columns:1fr 1fr}
     .readouts .cell:last-child{grid-column:1/-1}
   }
-  @media (prefers-reduced-motion:reduce){ .badge{box-shadow:none} }
+  @media (prefers-reduced-motion:reduce){
+    *, *::before, *::after{
+      animation-duration:.01ms !important;
+      animation-iteration-count:1 !important;
+      transition-duration:.01ms !important;
+      scroll-behavior:auto !important;
+    }
+    .badge{box-shadow:none}
+  }
 </style>
 </head>
 <body>
@@ -218,15 +243,14 @@
     <div class="sub">E–A–D–G–B–E · fundamental ou harmônico da 12ª casa</div>
   </header>
 
-  <!-- ==================== MOSTRADOR ==================== -->
   <div class="panel idle" id="displayPanel">
     <div class="noteWrap">
       <div class="stringTag" id="stringTag">—</div>
       <div class="noteBig" id="noteBig">–</div>
       <div class="targetHz" id="targetHz">alvo — Hz</div>
     </div>
-    <canvas id="gauge"></canvas>
-    <canvas id="fine"></canvas>
+    <canvas id="gauge" role="img" aria-label="Medidor de desvio em cents"></canvas>
+    <canvas id="fine" role="img" aria-label="Medidor fino de desvio em cents"></canvas>
     <div class="readouts">
       <div class="cell">
         <div class="lbl">Frequência</div>
@@ -241,27 +265,26 @@
         <div class="val" id="stableVal">— ¢</div>
       </div>
     </div>
-    <div class="badgeRow"><span class="badge" id="badge">AFINADO</span></div>
-    <div class="hint" id="hint"></div>
+    <div class="badgeRow"><span class="badge" id="badge" role="status" aria-live="polite">AFINADO</span></div>
+    <div class="hint" id="hint" role="status" aria-live="polite"></div>
   </div>
 
-  <!-- ==================== CONTROLES ==================== -->
   <div class="panel">
     <div class="rowLabel">O que você vai tocar</div>
     <div class="segbar" id="modeBar">
-      <button data-m="fund" class="active">Corda solta<span>fundamental</span></button>
-      <button data-m="harm">Harmônico<span>12ª casa</span></button>
+      <button data-m="fund" class="active" aria-pressed="true">Corda solta<span>fundamental</span></button>
+      <button data-m="harm" aria-pressed="false">Harmônico<span>12ª casa</span></button>
     </div>
 
     <div class="rowLabel sp">Corda</div>
     <div class="strings" id="stringBtns">
-      <button data-i="auto" class="active"><span class="bnote">Auto</span><span class="bstr">detectar</span></button>
-      <button data-i="0"><span class="dot"></span><span class="bnote">E2</span><span class="bstr">6ª corda</span></button>
-      <button data-i="1"><span class="dot"></span><span class="bnote">A2</span><span class="bstr">5ª corda</span></button>
-      <button data-i="2"><span class="dot"></span><span class="bnote">D3</span><span class="bstr">4ª corda</span></button>
-      <button data-i="3"><span class="dot"></span><span class="bnote">G3</span><span class="bstr">3ª corda</span></button>
-      <button data-i="4"><span class="dot"></span><span class="bnote">B3</span><span class="bstr">2ª corda</span></button>
-      <button data-i="5"><span class="dot"></span><span class="bnote">E4</span><span class="bstr">1ª corda</span></button>
+      <button data-i="auto" class="active" aria-pressed="true"><span class="bnote">Auto</span><span class="bstr">detectar</span></button>
+      <button data-i="0" aria-pressed="false"><span class="dot"></span><span class="bnote">E2</span><span class="bstr">6ª corda</span></button>
+      <button data-i="1" aria-pressed="false"><span class="dot"></span><span class="bnote">A2</span><span class="bstr">5ª corda</span></button>
+      <button data-i="2" aria-pressed="false"><span class="dot"></span><span class="bnote">D3</span><span class="bstr">4ª corda</span></button>
+      <button data-i="3" aria-pressed="false"><span class="dot"></span><span class="bnote">G3</span><span class="bstr">3ª corda</span></button>
+      <button data-i="4" aria-pressed="false"><span class="dot"></span><span class="bnote">B3</span><span class="bstr">2ª corda</span></button>
+      <button data-i="5" aria-pressed="false"><span class="dot"></span><span class="bnote">E4</span><span class="bstr">1ª corda</span></button>
     </div>
 
     <div class="calRow">
@@ -275,15 +298,14 @@
 
     <div class="startRow">
       <button id="startBtn">▶ Iniciar microfone</button>
-      <div id="status">Toque em iniciar e permita o acesso ao microfone.</div>
+      <div id="status" role="status" aria-live="polite">Toque em iniciar e permita o acesso ao microfone.</div>
     </div>
   </div>
 
-  <!-- ==================== CALIBRAÇÃO DE INARMONICIDADE ==================== -->
   <div class="panel">
     <div class="rowLabel">Inarmonicidade — medida da sua corda</div>
     <div class="wizBox">
-      <div id="wizMsg"><span class="step">como funciona</span><br>
+      <div id="wizMsg" aria-live="polite"><span class="step">como funciona</span><br>
         Escolha uma corda acima e toque em <b>Medir</b>. O afinador vai pedir a corda solta e
         depois o harmônico, e calcula sozinho o quanto o 2º parcial foge de 2f.</div>
       <div class="wizBar" id="wizBar"><div id="wizFill"></div></div>
@@ -322,9 +344,14 @@
 <script>
 'use strict';
 /* ============================================================
-   AFINADOR DE PRECISÃO v2
-   Modo fundamental + modo harmônico (12ª casa) com calibração
-   empírica de inarmonicidade por corda.
+   AFINADOR DE PRECISÃO v3
+   - Bugs corrigidos (targetIdx no Auto, displayCents no stop,
+     guard de checkWrongMode)
+   - Refino espectral reduzido (K=5, 16 iterações)
+   - BiquadFilter lowpass antes do AnalyserNode
+   - Persistência de A4 + calibração em localStorage
+   - Liberação de microfone em visibilitychange
+   - Acessibilidade (aria-live, aria-pressed)
    ============================================================ */
 
 const $ = id => document.getElementById(id);
@@ -341,31 +368,47 @@ const STRINGS = [
   {note:'E4', tag:'1ª corda', semi:-5},
 ];
 const state = { a4:440.0, mode:'auto', lockedIdx:null, pitch:'fund', running:false };
-
-// desvio medido do 2º parcial em relação a 2f, em cents (null = não calibrado)
 const cal = [null,null,null,null,null,null];
 
 const targetFreq = i => state.a4 * Math.pow(2, STRINGS[i].semi/12);
-// frequência que esperamos OUVIR na corda i, conforme o modo
 function listenFreq(i){
   if (state.pitch === 'fund') return targetFreq(i);
   const off = cal[i] || 0;
   return 2 * targetFreq(i) * Math.pow(2, off/1200);
 }
 
+/* ---------- persistência ---------- */
+const STORAGE_KEY = 'tuner.v3';
+function saveState(){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ a4: state.a4, cal })); } catch(e){}
+}
+function loadState(){
+  try {
+    const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    if (!d) return;
+    if (typeof d.a4 === 'number' && d.a4 >= 400 && d.a4 <= 470) state.a4 = d.a4;
+    if (Array.isArray(d.cal) && d.cal.length === 6)
+      d.cal.forEach((v,i) => {
+        if (v === null || (typeof v === 'number' && isFinite(v) && Math.abs(v) <= 25)) cal[i] = v;
+      });
+  } catch(e){}
+}
+loadState();
+
 /* ---------- áudio ---------- */
-let audioCtx=null, analyser=null, srcNode=null, mediaStream=null;
+let audioCtx=null, analyser=null, srcNode=null, filterNode=null, mediaStream=null;
 let timeBuf=null, xw=null, hann=null, dec=null;
 
 /* ---------- detecção / exibição ---------- */
 let lastDetectT=0, lastValidT=-1e9;
 let instantF=null, instantCents=null, displayCents=0;
 let targetIdx=null, autoPrev=-1, autoCount=0;
-let ring=[];        // {t, f}
-let stable=null;    // {mean, se, n}
+let ring=[];
+let stable=null;
 let rafId=0;
+let dotTimer=null;
 
-/* ---------- assistente de calibração ---------- */
+/* ---------- assistente ---------- */
 const wiz = { active:false, stage:'idle', idx:null, f1:null, f2:null };
 
 /* ============================================================
@@ -416,7 +459,7 @@ function yin(x, fs, fmin, fmax){
 }
 
 /* ============================================================
-   Refino espectral
+   Refino espectral (K=5, 16 iterações — ~metade do custo)
    ============================================================ */
 function dftMag2(f, fs){
   const w = 2*Math.PI*f/fs, cw=Math.cos(w), sw=Math.sin(w);
@@ -435,7 +478,7 @@ function dftMag2(f, fs){
 function refine(f0, fs){
   const half = Math.min(2.0, f0*0.015);
   let bestF=f0, bestM=-1;
-  const K=9, step = 2*half/(K-1);
+  const K=5, step = 2*half/(K-1);
   for (let k=0; k<K; k++){
     const f = f0 - half + step*k;
     const m = dftMag2(f, fs);
@@ -445,7 +488,7 @@ function refine(f0, fs){
   const gr = (Math.sqrt(5)-1)/2;
   let c = b - gr*(b-a), d = a + gr*(b-a);
   let fc = dftMag2(c, fs), fd = dftMag2(d, fs);
-  for (let i=0; i<30; i++){
+  for (let i=0; i<16; i++){
     if (fc > fd){ b=d; d=c; fd=fc; c=b-gr*(b-a); fc=dftMag2(c, fs); }
     else        { a=c; c=d; fc=fd; d=a+gr*(b-a); fd=dftMag2(d, fs); }
   }
@@ -453,7 +496,7 @@ function refine(f0, fs){
 }
 
 /* ============================================================
-   Estatística robusta sobre o anel
+   Estatística robusta
    ============================================================ */
 function median(arr){
   const s=[...arr].sort((x,y)=>x-y), m=s.length>>1;
@@ -472,12 +515,12 @@ function robustStats(){
   const va = keep.reduce((a,v)=>a+(v-m)*(v-m),0)/(keep.length-1);
   const sd = Math.sqrt(va);
   const span = ring[ring.length-1].t - ring[0].t;
-  const neff = Math.max(1.5, span/0.7);   // janelas de 0,7 s se sobrepõem
+  const neff = Math.max(1.5, span/0.7);
   return { f: med*Math.pow(2, m/1200), se: sd/Math.sqrt(neff), n: keep.length, span };
 }
 
 /* ============================================================
-   Faixa de busca conforme o modo / assistente
+   Faixa de busca
    ============================================================ */
 function searchRange(){
   const oct = s => Math.pow(2, s/12);
@@ -513,7 +556,6 @@ function detect(nowMs){
 
   const fs = audioCtx.sampleRate;
 
-  // decimação ×4
   const dLen = timeBuf.length >> 2;
   if (!dec || dec.length !== dLen) dec = new Float64Array(dLen);
   for (let k=0; k<dLen; k++){
@@ -528,16 +570,14 @@ function detect(nowMs){
     return;
   }
 
-  // janela Hann + DC
   let mean=0;
   for (let n=0; n<timeBuf.length; n++) mean += timeBuf[n];
   mean /= timeBuf.length;
   for (let n=0; n<timeBuf.length; n++) xw[n] = (timeBuf[n]-mean)*hann[n];
 
   const f = refine(y.f, fs);
-  if (!(f>0) || Math.abs(1200*Math.log2(f/y.f)) > 60) return;
+  if (!(f>0) || Math.abs(1200*Math.log2(f/y.f)) > 40) return;
 
-  // anel: reinicia após pausa longa (nova palhetada)
   if (lastValidT > 0 && (nowMs - lastValidT) > 1000) ring.length = 0;
   ring.push({t, f});
   while (ring.length && t - ring[0].t > 2.5) ring.shift();
@@ -546,13 +586,8 @@ function detect(nowMs){
 
   const st = robustStats();
 
-  /* ---------- modo assistente ---------- */
-  if (wiz.active){
-    wizardTick(st);
-    return;
-  }
+  if (wiz.active){ wizardTick(st); return; }
 
-  /* ---------- modo normal ---------- */
   let newIdx = targetIdx;
   if (state.mode==='lock'){ newIdx = state.lockedIdx; }
   else {
@@ -578,9 +613,9 @@ function detect(nowMs){
   setStatus(state.mode==='auto' ? 'Detecção automática ativa.' : 'Corda travada.');
 }
 
-/* aviso: tocou corda solta no modo harmônico (ou vice-versa) */
 function checkWrongMode(f){
   const h = $('hint');
+  if (state.mode === 'lock'){ h.classList.remove('show'); return; }
   const distTo = arr => Math.min(...arr.map(v => Math.abs(1200*Math.log2(f/v))));
   const funds = STRINGS.map((_,i)=>targetFreq(i));
   const harms = STRINGS.map((_,i)=>2*targetFreq(i));
@@ -598,7 +633,7 @@ function checkWrongMode(f){
    Assistente de calibração
    ============================================================ */
 function wizStart(){
-  if (state.mode!=='lock'){ return; }
+  if (state.mode!=='lock') return;
   if (!state.running){ setStatus('Inicie o microfone primeiro.'); return; }
   wiz.active=true; wiz.idx=state.lockedIdx; wiz.f1=null; wiz.f2=null; wiz.stage='open';
   ring.length=0; stable=null;
@@ -622,7 +657,6 @@ function wizMsg(step, html){
   $('wizMsg').innerHTML = '<span class="step">'+step+'</span><br>'+html;
 }
 function wizardTick(st){
-  // progresso: precisa de amostras, tempo e precisão
   let p = 0;
   if (st){
     const pn = Math.min(1, st.n/9);
@@ -659,7 +693,7 @@ function wizardTick(st){
     $('wizCancel').hidden=true;
     $('wizBar').classList.remove('show'); $('wizFill').style.width='0%';
     ring.length=0; stable=null;
-    refreshWizBtn(); renderCal();
+    refreshWizBtn(); renderCal(); saveState();
     wizMsg('medido',
       STRINGS[wiz.idx].tag+': o 2º parcial está <b>'+fmtS(off,3)+' ¢</b> em relação a 2f '+
       '(B = '+fmtB(B)+'). O alvo do modo harmônico já foi corrigido.');
@@ -675,7 +709,7 @@ function fmtB(B){
 }
 
 /* ============================================================
-   DOM
+   UI
    ============================================================ */
 function setStatus(msg){ $('status').textContent = msg; }
 
@@ -745,11 +779,23 @@ function refreshWizBtn(){
 }
 
 /* ============================================================
-   Desenho
+   Desenho (canvas com cache de dimensões)
    ============================================================ */
+const _dims = new WeakMap();
+const _ro = (typeof ResizeObserver !== 'undefined')
+  ? new ResizeObserver(entries => {
+      entries.forEach(e => _dims.delete(e.target));
+    })
+  : null;
+
 function sizeCanvas(cv){
   const dpr = window.devicePixelRatio || 1;
-  const r = cv.getBoundingClientRect();
+  let r = _dims.get(cv);
+  if (!r){
+    r = cv.getBoundingClientRect();
+    _dims.set(cv, r);
+    if (_ro) _ro.observe(cv);
+  }
   const w = Math.round(r.width*dpr), h = Math.round(r.height*dpr);
   if (cv.width!==w || cv.height!==h){ cv.width=w; cv.height=h; }
   const g = cv.getContext('2d');
@@ -789,7 +835,7 @@ function drawGauge(active, tuned){
     }
   }
   g.font='13px -apple-system, sans-serif';
-  g.fillStyle='rgba(125,106,78,.9)';
+  g.fillStyle='rgba(160,138,104,.9)';
   const aL=rad(-66), aR=rad(66), rE=R+2;
   g.fillText('♭', cx+rE*Math.cos(aL), cy+rE*Math.sin(aL));
   g.fillText('♯', cx+rE*Math.cos(aR), cy+rE*Math.sin(aR));
@@ -816,7 +862,7 @@ function drawFine(active){
   const X = c => pad + (Math.max(-5,Math.min(5,c))+5)/10*span;
 
   g.font='10px -apple-system, sans-serif';
-  g.fillStyle='rgba(125,106,78,.9)';
+  g.fillStyle='rgba(160,138,104,.9)';
   g.textAlign='left'; g.fillText('zoom ±5 ¢', pad, 11);
 
   g.fillStyle='rgba(127,224,154,.10)';
@@ -901,15 +947,25 @@ async function start(){
   }
   audioCtx = new (window.AudioContext||window.webkitAudioContext)();
   await audioCtx.resume();
+  if (audioCtx.sampleRate < 22050){
+    setStatus('Taxa de amostragem baixa (' + audioCtx.sampleRate + ' Hz) — precisão reduzida.');
+  }
+
   srcNode  = audioCtx.createMediaStreamSource(mediaStream);
+  filterNode = audioCtx.createBiquadFilter();
+  filterNode.type = 'lowpass';
+  filterNode.frequency.value = 1500;
+  filterNode.Q.value = 0.7;
   analyser = audioCtx.createAnalyser();
   analyser.fftSize = 32768;
   analyser.smoothingTimeConstant = 0;
-  srcNode.connect(analyser);
+  srcNode.connect(filterNode);
+  filterNode.connect(analyser);
 
   timeBuf = new Float32Array(analyser.fftSize);
   hann    = new Float64Array(analyser.fftSize);
   xw      = new Float64Array(analyser.fftSize);
+  dec     = new Float64Array(analyser.fftSize >> 2);
   for (let n=0; n<hann.length; n++)
     hann[n] = 0.5*(1 - Math.cos(2*Math.PI*n/(hann.length-1)));
 
@@ -917,6 +973,7 @@ async function start(){
   ring.length=0; stable=null; instantCents=null; targetIdx=null; lastValidT=-1e9;
   $('startBtn').textContent='■ Parar'; $('startBtn').classList.add('running');
   setStatus('Aguardando som…');
+  startDotTimer();
   loop();
 }
 function stop(){
@@ -925,8 +982,9 @@ function stop(){
   wizCancel();
   if (mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
   if (audioCtx) audioCtx.close();
-  audioCtx=null; analyser=null; mediaStream=null;
-  instantCents=null; stable=null;
+  audioCtx=null; analyser=null; mediaStream=null; srcNode=null; filterNode=null;
+  instantCents=null; stable=null; displayCents=0; instantF=null;
+  stopDotTimer();
   goIdle();
   $('noteBig').textContent='–'; $('stringTag').textContent='—';
   $('targetHz').textContent='alvo — Hz';
@@ -935,13 +993,32 @@ function stop(){
   setStatus('Microfone parado.');
   drawGauge(false,false); drawFine(false);
 }
+
+function startDotTimer(){
+  if (dotTimer) clearInterval(dotTimer);
+  dotTimer = setInterval(()=>{
+    if (state.mode!=='auto') return;
+    document.querySelectorAll('#stringBtns button').forEach(b=>{
+      b.classList.toggle('detected', b.dataset.i!=='auto' && +b.dataset.i===targetIdx
+        && performance.now()-lastValidT<1200);
+    });
+  }, 200);
+}
+function stopDotTimer(){
+  if (dotTimer){ clearInterval(dotTimer); dotTimer = null; }
+}
+
 $('startBtn').addEventListener('click', ()=> state.running ? stop() : start());
 
 /* ---------- modo fundamental / harmônico ---------- */
 document.querySelectorAll('#modeBar button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
-    document.querySelectorAll('#modeBar button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('#modeBar button').forEach(b=>{
+      b.classList.remove('active');
+      b.setAttribute('aria-pressed','false');
+    });
     btn.classList.add('active');
+    btn.setAttribute('aria-pressed','true');
     state.pitch = btn.dataset.m;
     wizCancel();
     ring.length=0; stable=null; instantCents=null; targetIdx=null; autoCount=0; autoPrev=-1;
@@ -960,30 +1037,28 @@ function showLockedTarget(){
 }
 document.querySelectorAll('#stringBtns button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
-    document.querySelectorAll('#stringBtns button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('#stringBtns button').forEach(b=>{
+      b.classList.remove('active');
+      b.setAttribute('aria-pressed','false');
+    });
     btn.classList.add('active');
+    btn.setAttribute('aria-pressed','true');
     wizCancel();
     const v = btn.dataset.i;
-    if (v==='auto'){ state.mode='auto'; state.lockedIdx=null; }
+    if (v==='auto'){ state.mode='auto'; state.lockedIdx=null; targetIdx=null; }
     else { state.mode='lock'; state.lockedIdx=+v; targetIdx=+v; }
     ring.length=0; stable=null; autoCount=0; autoPrev=-1;
     if (state.mode==='lock') showLockedTarget();
     refreshWizBtn(); renderCal();
   });
 });
-setInterval(()=>{
-  if (state.mode!=='auto') return;
-  document.querySelectorAll('#stringBtns button').forEach(b=>{
-    b.classList.toggle('detected', b.dataset.i!=='auto' && +b.dataset.i===targetIdx
-      && performance.now()-lastValidT<1200);
-  });
-}, 200);
 
 /* ---------- calibração A4 ---------- */
 function refreshA4(){
   $('a4disp').textContent = 'A4 = ' + fmt(state.a4,1) + ' Hz';
   ring.length=0; stable=null;
   if (state.mode==='lock') showLockedTarget();
+  saveState();
 }
 document.querySelectorAll('.calRow button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -999,7 +1074,7 @@ $('wizBtn').addEventListener('click', wizStart);
 $('wizCancel').addEventListener('click', wizCancel);
 $('calClear').addEventListener('click', ()=>{
   for (let i=0;i<6;i++) cal[i]=null;
-  renderCal();
+  renderCal(); saveState();
   if (state.mode==='lock') showLockedTarget();
 });
 $('calLink').addEventListener('click', ()=>{
@@ -1011,7 +1086,7 @@ $('calLink').addEventListener('click', ()=>{
   else prompt('Copie o link:', url);
 });
 
-/* ---------- calibração vinda da URL ---------- */
+/* ---------- calibração via URL (sobrescreve localStorage) ---------- */
 (function loadCalFromHash(){
   const m = /(?:^|[#&])cal=([^&]+)/.exec(location.hash);
   if (!m) return;
@@ -1020,13 +1095,33 @@ $('calLink').addEventListener('click', ()=>{
   parts.forEach((p,i)=>{
     const v = parseFloat(p);
     if (isFinite(v) && Math.abs(v)<=25) cal[i]=v;
+    else if (p === 'x') cal[i]=null;
   });
+  saveState();
 })();
 
-/* ---------- primeiro desenho ---------- */
-window.addEventListener('resize', ()=>{ drawGauge(false,false); drawFine(false); });
-renderCal(); refreshWizBtn();
-drawGauge(false,false); drawFine(false);
+/* ---------- liberar microfone ao esconder a aba ---------- */
+document.addEventListener('visibilitychange', ()=>{
+  if (document.hidden && state.running){
+    const wasRunning = state.running;
+    stop();
+    if (wasRunning) setStatus('Pausado — toque em iniciar para retomar.');
+  }
+});
+
+/* ---------- primeiro desenho + refresh ---------- */
+window.addEventListener('resize', ()=>{
+  // invalida cache de dimensões
+  _dims.delete($('gauge'));
+  _dims.delete($('fine'));
+  drawGauge(false,false); drawFine(false);
+});
+
+refreshA4();
+renderCal();
+refreshWizBtn();
+drawGauge(false,false);
+drawFine(false);
 </script>
 <script>
 if ('serviceWorker' in navigator) {
