@@ -378,7 +378,7 @@ function listenFreq(i){
 }
 
 /* ---------- persistência ---------- */
-const STORAGE_KEY = 'tuner.v3';
+const STORAGE_KEY = 'afinadorCompleto_cal_v1';
 function saveState(){
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ a4: state.a4, cal })); } catch(e){}
 }
